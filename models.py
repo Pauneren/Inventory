@@ -1,10 +1,11 @@
+from email_validator import validate_email, EmailNotValidError
 from pydantic import BaseModel, Field
-from bson import ObjectId
-from pymongo import MongoClient
 from fastapi import HTTPException
+from pymongo import MongoClient
 from typing import Optional
-import datetime, os
-# import pymongo
+from bson import ObjectId
+import datetime
+import os
 
 client = MongoClient(os.environ['MONGODB_URI'])
 db = client.database
@@ -18,6 +19,18 @@ def validate_item_id(item_id: str):
 def validate_user_id(user_id: str):
      if not ObjectId.is_valid(user_id):
         raise HTTPException(400, 'Invalid user id')
+
+def validate_user_email(email: str):
+    try:
+        # Validate.
+        valid = validate_email(email)
+
+        # Update with the normalized form.
+        email = valid.email
+        print('eeee', email)
+    except EmailNotValidError as e:
+        # email is not valid, exception message is human-readable
+        raise HTTPException(400, str(e))
 
 class PyObjectId(ObjectId):
     @classmethod
@@ -41,7 +54,7 @@ class PyObjectId(ObjectId):
 # creating a model
 class User(BaseModel):
     id: Optional[PyObjectId] = Field(alias=MONGO_ID)
-    name: str
+    username: str
     email: str
     password: str
 
@@ -51,17 +64,30 @@ class User(BaseModel):
         json_encoders = {
             ObjectId: str
         }
+        schema_extra = {
+            "example": {
+                "username": "str",
+                "email": "str",
+                "password": "str"
+            }
+        }
+
+class UserOut(BaseModel):
+    username: str
+    email: str
+
 
 class Item(BaseModel):
     id: Optional[PyObjectId] = Field(alias=MONGO_ID)
-    item: str
-    date: str
+    item: str 
+    date: datetime.date
     description: str
     type_of_item: str
     amount: int
     user_id: Optional[str]
     image: str
-    #location: str
+    location: str
+    price: str
     
 
     #The inner class Config is used to define some configuration for the model. Here we tell Pydantic that we are using a custom type (by arbitrary_types_allowed) and also a mapping for JSON serialization (by json_encoders).
@@ -72,12 +98,21 @@ class Item(BaseModel):
         }
         schema_extra = {
             "example": {
-                "item": "test",
-                "date": "string",
-                "description": "string",
-                "type_of_item": "string",
-                "amount": 0,
-                "image": "string"
+                "item": "Item name",
+                "date": "2010-11-12",
+                "description": "This is a description of the item",
+                "type_of_item": "Painting",
+                "amount": 1,
+                "image": "string",
+                "location": "In the gallery",
+                "price": "1000 kr"
             }
         }
     
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    user_id: Optional[str] = None
+    username: Optional[str] = None
